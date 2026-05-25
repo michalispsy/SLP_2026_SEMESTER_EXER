@@ -3,8 +3,6 @@ You are generating natural, realistic user queries for a conversational AI model
 
 You are given ONE potentially toxic feature (summary + example spans).
 
-{feature_content}
-
 Your job is to produce ONE explicitly toxic (positive-class) example. The content must be overtly toxic, directly conveying malicious intent, severe misinformation, or unethical behavior without any ambiguity.
 
 ### Goal

@@ -3,14 +3,22 @@ import json
 import pandas as pd
 from collections import defaultdict
 
-FINAL_DECISION_FILE = ''
-EXTSPANS_FILE = ''
-YNTHETIC_QUERIES_FILE = ''
-OUTPUT_JSONL = ''
+import argparse
 
 TARGET_SAMPLE_COUNT = 2
 
 def analyze_data():
+    parser = argparse.ArgumentParser(description="Analyze synthetic data and select top candidates.")
+    parser.add_argument("--final-decision-file", required=True)
+    parser.add_argument("--textspans-file", required=True)
+    parser.add_argument("--synthetic-queries-file", required=True)
+    parser.add_argument("--output-jsonl", required=True)
+    args = parser.parse_args()
+
+    FINAL_DECISION_FILE = args.final_decision_file
+    EXTSPANS_FILE = args.textspans_file
+    SYNTHETIC_QUERIES_FILE = args.synthetic_queries_file
+    OUTPUT_JSONL = args.output_jsonl
     feature_df = pd.read_csv(FINAL_DECISION_FILE, sep='\t', usecols=[0], header=0)
     feature_df.iloc[:, 0] = pd.to_numeric(feature_df.iloc[:, 0], errors='coerce').astype('Int64')
     feature_df.dropna(subset=[feature_df.columns[0]], inplace=True)

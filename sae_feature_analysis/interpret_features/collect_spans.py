@@ -44,7 +44,7 @@ class TopKCollector:
 
 IDX = tc.arange(65536)
 
-def activations(messages, model, sae, tokenizer, size=32, shift=31):
+def activations(messages, model, sae, tokenizer, threshold, size=32, shift=31):
     """
     Compute neuron activations for one conversation.
     'messages' is a list of {"role": ..., "content": ...}.
@@ -66,7 +66,7 @@ def activations(messages, model, sae, tokenizer, size=32, shift=31):
     device = model._device
     IDX_dev = IDX.to(device)
     act, pos = sae.actvs.squeeze()[shift:].max(dim=0)
-    choose = act > args.threshold
+    choose = act > threshold
     idx = IDX_dev[choose].tolist()
     act = act[choose].float().cpu().tolist()
     pos = pos[choose].cpu().tolist()
@@ -76,14 +76,14 @@ def activations(messages, model, sae, tokenizer, size=32, shift=31):
     sae.topk = topk
     return {"Neurons": idx, "Spans": spans, "Scores": act}
 
-def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, ttlgroup, max_collects):
+def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, ttlgroup, threshold, data_path, max_collects):
     sae.eval()
     sae.MaskTopK = False
     generator._model.eval()
     switch_mode(sae, "train")
     sae.early_stop = True
-    dataset_name = os.path.splitext(os.path.basename(args.data_path))[0]
-    root = f"./xxx/threshold_{args.threshold}"
+    dataset_name = os.path.splitext(os.path.basename(data_path))[0]
+    root = f"./xxx/threshold_{threshold}"
     os.makedirs(root, exist_ok=True)
 
     collectors = [TopKCollector(max_collects) for _ in range(65536)]
@@ -93,6 +93,11 @@ def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, 
         bar.update(1)
         if idx % ttlgroup != subgroup:
             continue
+
+        # Strip trailing label (e.g. \t1 or \t0) to prevent leaking into tokenizer context
+        parts = text.rsplit("\t", 1)
+        if len(parts) == 2 and parts[1].strip().isdigit():
+            text = parts[0]
 
         text = text.replace("\\n", "\n").replace("\\t", "\t")
         if "Human:" in text or "Assistant:" in text:
@@ -116,7 +121,7 @@ def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, 
             print(f"[WARN] Empty message skipped at sample {idx}")
             continue
         try:
-            results = activations(messages, generator, sae, tokenizer)
+            results = activations(messages, generator, sae, tokenizer, threshold)
         except Exception as e:
             print(f"[WARN] Template error at sample {idx}: {e}")
             continue
@@ -192,6 +197,6 @@ if __name__ == "__main__":
     mount_function(generator._model, model_key, int(layer), sae)
 
     with tc.no_grad():
-        collect_text_spans(corpus, sae, generator, tokenizer, model_key, subgroup, ttlgroup, max_collects=1000)
+        collect_text_spans(corpus, sae, generator, tokenizer, model_key, subgroup, ttlgroup, args.threshold, args.data_path, max_collects=1000)
 
    

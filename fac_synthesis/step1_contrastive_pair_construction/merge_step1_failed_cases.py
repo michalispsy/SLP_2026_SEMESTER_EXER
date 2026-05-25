@@ -1,10 +1,8 @@
 import re
 import json
 import pandas as pd
+import argparse
 
-FINAL_DECISION_FILE = "xxx.tsv"
-TRIPLETS_FILE = "xxx.jsonl"
-OUTPUT_FILE = "xxx.jsonl"
 
 def split_summary_and_spans(text):
     text = text.replace("\\n", "\n")
@@ -25,6 +23,16 @@ def is_activated_sample(s):
         return False
 
 def merge_jsonl():
+    parser = argparse.ArgumentParser(description="Merge contrastive pairs.")
+    parser.add_argument("--final-decision-file", required=True)
+    parser.add_argument("--triplets-file", required=True)
+    parser.add_argument("--output-file", required=True)
+    args = parser.parse_args()
+
+    FINAL_DECISION_FILE = args.final_decision_file
+    TRIPLETS_FILE = args.triplets_file
+    OUTPUT_FILE = args.output_file
+
     summary_map = {}
     span_map = {}
     df = pd.read_csv(FINAL_DECISION_FILE, sep="\t", header=0, dtype=str, keep_default_na=False)

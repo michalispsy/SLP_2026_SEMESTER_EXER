@@ -48,12 +48,14 @@ def main():
                 if "FeatureID" in line and "Summary" in line:
                     header_skipped = True
                     continue
-            parts = line.split(None, 1)
+            parts = line.split("\t")
             if len(parts) < 2:
                 continue
-            fid, summary = parts[0].strip(), parts[1].strip().strip('"').strip("'").replace('""', '"')
+            fid = parts[0].strip()
+            summary = parts[1].strip().strip('"').strip("'").replace('""', '"')
+            words = parts[2].strip() if len(parts) > 2 else ""
             if fid.isdigit():
-                features.append({"FeatureID": fid, "Summary": summary})
+                features.append({"FeatureID": fid, "Summary": summary, "Words": words})
     if not features:
         raise ValueError("No valid features found.")
 
@@ -77,58 +79,76 @@ def main():
             context_text = f"Feature Summary: {summary}\nExample Spans:\n{spans_clean}"
         else:
             context_text = f"Feature Summary: {summary}"
-        for i in range(num_per_feature):
-            feature_content = context_text.strip()
-            user_msg = "Generate ONE explicitly toxic user query in the required format."
-            response = llama3_generate(
-            user_msg,
-            temperature=args.temperature,
-            num_return_sequences=args.num_synthetic_samples,
-            feature_content=feature_content
-            )
-            if not response:
-                print(f"[WARN] Empty response for feature {fid}")
-                continue
-            for text in response:
-                if not text.strip():
-                    continue
-                text = text.strip()
-
+        feature_content = context_text.strip()
+        user_msg = feature_content
+        
+        # Guarantee exactly args.num_synthetic_samples generated queries per feature
+        for slot in range(args.num_synthetic_samples):
+            success = False
+            qtext = ""
+            
+            # Retry loop: exactly 5 retries as requested
+            for attempt in range(1, 6):
                 try:
-                    label = 1
-
-                    segs = re.findall(
-                            r'(?:^|\n)\s*(Query-\d+\s*:\s*.*?)(?=(?:\n\s*Query-\d+\s*:)|(?:\t\s*[01]\s*$)|$)',
-                            text,
-                            flags=re.S
+                    response = llama3_generate(
+                        user_msg,
+                        temperature=args.temperature,
+                        num_return_sequences=1,
+                        feature_content=feature_content
                     )
-
-                    if not segs:
-                        print(f"[WARN] No valid Query segments for feature {fid}")
-                        error_fids.append(int(fid))
+                    
+                    if not response or not response[0].strip():
+                        print(f"[WARN] Empty response for FeatureID {fid}, slot {slot}, attempt {attempt}")
                         continue
+                        
+                    text = response[0].strip()
 
+                    label = 1
+                    
+                    # Relaxed regex to catch "Query-1", "Query 1", etc.
+                    segs = re.findall(
+                        r'(?:^|\n)\s*(Query[- ]\d+\s*:\s*.*?)(?=(?:\n\s*Query[- ]\d+\s*:)|(?:\t\s*[01]\s*$)|$)',
+                        text,
+                        flags=re.S
+                    )
+                    
+                    if not segs:
+                        print(f"[WARN] No valid Query segments for FeatureID {fid}, slot {slot}, attempt {attempt}")
+                        continue
+                        
                     tmp = []
                     for s in segs:
-                        m_idx = re.match(r'\s*Query-(\d+)\s*:', s)
+                        m_idx = re.match(r'\s*Query[- ](\d+)\s*:', s)
                         idx = int(m_idx.group(1)) if m_idx else 999999
                         tmp.append((idx, s.strip()))
                     tmp.sort(key=lambda x: x[0])
-
+                    
                     qtext = "\n".join(s for _, s in tmp)
-
-                    all_tasks.append((qtext, str(label)))
-                    all_q_records.append({
-                        "FeatureID": fid,
-                        "query": qtext,
-                        "label": label,
-                        "context_used": context_text[:4000]
-                     })
+                    
+                    if qtext.strip():
+                        success = True
+                        break # Successfully generated and parsed, break out of retry loop
 
                 except Exception as e:
-                    print(f"[skip {fid}] {e}")
+                    print(f"[ERROR] Exception on FeatureID {fid}, slot {slot}, attempt {attempt}: {e}")
+                    
+            if not success:
+                print(f"[CRITICAL] All 5 attempts failed for FeatureID {fid}, slot {slot}. Using fallback placeholder.")
+                if int(fid) not in error_fids:
+                    error_fids.append(int(fid))
+                # Fallback placeholder to maintain sequence index alignment
+                qtext = f"Query-1: This is a placeholder toxic query to maintain feature sequence alignment for missing feature {fid}."
+                
+            label = 1
+            all_tasks.append((qtext, str(label)))
+            all_q_records.append({
+                "FeatureID": fid,
+                "query": qtext,
+                "label": label,
+                "context_used": context_text[:4000]
+            })
 
-            time.sleep(args.sleep)
+        time.sleep(args.sleep)
     print(f"Features with no valid segments: {error_fids}")
 
     tsv_out = args.out + ".queries.tsv"
