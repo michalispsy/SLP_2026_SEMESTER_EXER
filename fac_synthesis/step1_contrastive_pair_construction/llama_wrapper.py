@@ -28,9 +28,11 @@ def llama3_generate(
         messages.append({"role": "assistant", "content": example[1].strip()})
     messages.append({"role": "user", "content": prompt.strip()})
     input_ids = tokenizer.apply_chat_template(messages, return_tensors="pt").to(model.device)
+    attention_mask = torch.ones_like(input_ids)
     with torch.no_grad():
         outputs = model.generate(
             input_ids=input_ids,
+            attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_p=0.9,

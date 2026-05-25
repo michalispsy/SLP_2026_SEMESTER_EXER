@@ -32,10 +32,12 @@ def llama3_generate(prompt: str, temperature=0.8, max_new_tokens=900, num_return
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     input_ids = tokenizer.apply_chat_template(messages, return_tensors="pt").to(model.device)
+    attention_mask = torch.ones_like(input_ids)
 
     with torch.no_grad():
         outputs = model.generate(
             input_ids=input_ids,
+            attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             top_p=0.9,

@@ -84,9 +84,11 @@ class Generator:
             add_generation_prompt=True,
             return_tensors="pt"
         ).to(self._device)
+        attention_mask = tc.ones_like(inputs)
 
         outputs = self._model.generate(
             inputs,
+            attention_mask=attention_mask,
             pad_token_id=self._tokenizer.eos_token_id,
             **kwrds
         )

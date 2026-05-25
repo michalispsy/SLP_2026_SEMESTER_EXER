@@ -7,13 +7,14 @@
 ## Table of Contents
 
 1. [Script 1: `generate_data_llama_r1.py` — TSV Parsing Failure](#1-generate_data_llama_r1py--tsv-parsing-failure)
-2. [Script 1: `generate_data_llama_r1.py` — Sequence Misalignment](#2-generate_data_llama_r1py--sequence-misalignment)
-3. [Script 1: `generate_data_llama_r1.py` — Strict Regex Parsing](#3-generate_data_llama_r1py--strict-regex-parsing)
-4. [Script 1 + `prompt_config.py` — Few-Shot Prompt Pattern Break](#4-generate_data_llama_r1py--prompt_configpy--few-shot-prompt-pattern-break)
-5. [Script 2: `collect_spans.py` — Label Contamination](#5-collect_spanspy--label-contamination-in-sae-tokenizer)
-6. [Script 2: `collect_spans.py` — Global `args` Namespace Error](#6-collect_spanspy--global-args-namespace-error)
-7. [Script 3: `analyze_step1_synthetic_data.py` — Hardcoded Paths & Fatal Typo](#7-analyze_step1_synthetic_datapy--hardcoded-paths--fatal-typo)
-8. [Script 4: `merge_step1_failed_cases.py` — Hardcoded Mock Paths](#8-merge_step1_failed_casespy--hardcoded-mock-paths)
+2. [Script 2: `generate_data_llama_r1.py` — Sequence Misalignment](#2-generate_data_llama_r1py--sequence-misalignment)
+3. [Script 3: `generate_data_llama_r1.py` — Strict Regex Parsing](#3-generate_data_llama_r1py--strict-regex-parsing)
+4. [Script 4: `prompt_config.py` + `generate_data_llama_r1.py` — Few-Shot Prompt Pattern Break](#4-prompt_configpy--generate_data_llama_r1py--few-shot-prompt-pattern-break)
+5. [Script 5: `collect_spans.py` — Label Contamination](#5-collect_spanspy--label-contamination-in-sae-tokenizer)
+6. [Script 6: `collect_spans.py` — Global `args` Namespace Error](#6-collect_spanspy--global-args-namespace-error)
+7. [Script 7: `analyze_step1_synthetic_data.py` — Hardcoded Paths & Fatal Typo](#7-analyze_step1_synthetic_datapy--hardcoded-paths--fatal-typo)
+8. [Script 8: `merge_step1_failed_cases.py` — Hardcoded Mock Paths](#8-merge_step1_failed_casespy--hardcoded-mock-paths)
+9. [Model Wrappers — Missing Attention Mask & Non-Deterministic Warning](#9-model-wrappers--missing-attention-mask--non-deterministic-warning)
 
 ---
 
@@ -419,9 +420,61 @@ def merge_jsonl():
 
 ---
 
+## 9. Model Wrappers — Missing Attention Mask & Non-Deterministic Warning
+
+**Files:**
+* `fac_synthesis/step1_contrastive_pair_construction/llama_wrapper.py`
+* `fac_synthesis/step2_feature_covered_sample_synthesis/llama_wrapper.py`
+* `sae_feature_analysis/interpret_features/generator.py`
+* `training_scripts/behavior_steering/llama_wrapper.py`
+
+### The Bug
+
+During batch model generation, the `attention_mask` keyword argument was omitted from the call to `model.generate()`. The generator only received the raw tokenized tensor:
+
+```python
+# Original code (Step 1 llama_wrapper.py)
+outputs = model.generate(
+    input_ids=input_ids,
+    max_new_tokens=max_new_tokens,
+    temperature=temperature,
+    top_p=0.9,
+    do_sample=True,
+    num_return_sequences=num_return_sequences,
+    pad_token_id=tokenizer.eos_token_id,
+)
+```
+
+### Why It Matters
+
+Because Meta-Llama-3/3.1 sets the padding token (`pad_token`) to be identical to the end-of-sentence token (`eos_token`), Hugging Face's generation engine cannot safely auto-infer an attention mask from input shapes. This triggered a verbose warning on every generation step:
+
+> *"The attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's attention_mask to obtain reliable results."*
+
+Without an explicit attention mask under identical pad/eos token configurations:
+1. Downstream attention patterns can leak into padded token states.
+2. The model's generation loses absolute determinism and consistency across batch sizes, degrading the precision and reliability of the synthesized toxic queries.
+
+### The Fix
+
+We explicitly constructed an attention mask tensor of ones matching the shape of the input tensor and passed it to `model.generate()`:
+
+```diff
+     input_ids = tokenizer.apply_chat_template(messages, return_tensors="pt").to(model.device)
++    attention_mask = torch.ones_like(input_ids)
+     with torch.no_grad():
+         outputs = model.generate(
+             input_ids=input_ids,
++            attention_mask=attention_mask,
+             max_new_tokens=max_new_tokens,
+             temperature=temperature,
+```
+
+---
+
 ## Summary Table
 
-| # | Script | Bug | Severity | Impact | Status |
+| # | Script / Module | Bug | Severity | Impact | Status |
 |---|--------|-----|----------|--------|--------|
 | 1 | `generate_data_llama_r1.py` | TSV parsed with `split(None,1)` instead of `split("\t")` | **Critical** | Example Spans permanently blank in LLM prompt | ✅ Fixed |
 | 2 | `generate_data_llama_r1.py` | No retry loop, no fallback placeholder | **Critical** | Downstream feature↔query index mapping silently corrupted | ✅ Fixed |
@@ -431,3 +484,4 @@ def merge_jsonl():
 | 6 | `collect_spans.py` | `args.threshold` accessed via global namespace | Medium | `NameError` crash when imported outside `__main__` | ✅ Fixed |
 | 7 | `analyze_step1_synthetic_data.py` | Empty hardcoded paths + `YNTHETIC` typo | **Critical** | Instant `NameError` crash, script cannot execute | ✅ Fixed |
 | 8 | `merge_step1_failed_cases.py` | Mock `"xxx.tsv"` placeholder paths | High | `FileNotFoundError` crash, requires manual code editing | ✅ Fixed |
+| 9 | Model Wrappers | Omitted `attention_mask` with identical pad/eos tokens | High | Non-deterministic generation, batch attention leakage, warning spam | ✅ Fixed |

@@ -125,8 +125,10 @@ class Llama3Wrapper:
 
     @t.no_grad()
     def generate(self, tokens, max_new_tokens=100):
+        attention_mask = t.ones_like(tokens)
         generated = self.model.generate(
             inputs=tokens,
+            attention_mask=attention_mask,
             max_new_tokens=max_new_tokens,
             top_k=1
         )
