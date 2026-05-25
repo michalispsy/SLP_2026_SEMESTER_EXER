@@ -76,14 +76,14 @@ def activations(messages, model, sae, tokenizer, threshold, size=32, shift=31):
     sae.topk = topk
     return {"Neurons": idx, "Spans": spans, "Scores": act}
 
-def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, ttlgroup, threshold, data_path, max_collects):
+def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, ttlgroup, threshold, data_path, out_dir, max_collects):
     sae.eval()
     sae.MaskTopK = False
     generator._model.eval()
     switch_mode(sae, "train")
     sae.early_stop = True
     dataset_name = os.path.splitext(os.path.basename(data_path))[0]
-    root = f"./xxx/threshold_{threshold}"
+    root = os.path.join(out_dir, f"threshold_{threshold}")
     os.makedirs(root, exist_ok=True)
 
     collectors = [TopKCollector(max_collects) for _ in range(65536)]
@@ -157,6 +157,8 @@ if __name__ == "__main__":
                         help="Path to the input dataset file (e.g., TD_train_1.tsv)")
     parser.add_argument("--threshold", type=float, required=True,
                         help="Activation threshold (e.g., 0, 0.5, 1.0, 1.5, 2.0, 4.0)")
+    parser.add_argument("--out-dir", type=str, default="./xxx",
+                        help="Output directory for the collected spans.")
     
     args = parser.parse_args()
 
@@ -197,6 +199,6 @@ if __name__ == "__main__":
     mount_function(generator._model, model_key, int(layer), sae)
 
     with tc.no_grad():
-        collect_text_spans(corpus, sae, generator, tokenizer, model_key, subgroup, ttlgroup, args.threshold, args.data_path, max_collects=1000)
+        collect_text_spans(corpus, sae, generator, tokenizer, model_key, subgroup, ttlgroup, args.threshold, args.data_path, args.out_dir, max_collects=1000)
 
    
