@@ -143,6 +143,7 @@ def main():
                         
                         if not segs:
                             print(f"[WARN] No valid Query segments for FeatureID {fid}, slot {slot}, attempt {attempt}")
+                            print(f"[DEBUG] Raw Llama response was: {text}\n" + "-"*60)
                             continue
                             
                         tmp = []

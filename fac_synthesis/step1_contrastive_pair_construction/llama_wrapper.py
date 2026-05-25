@@ -2,7 +2,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from prompt_config import SYSTEM_PROMPT, EXAMPLES
 
-model_name = "meta-llama/Llama-3.1-8B-Instruct"
+model_name = "mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated"
 
 tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 model = AutoModelForCausalLM.from_pretrained(
