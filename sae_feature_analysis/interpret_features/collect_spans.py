@@ -96,6 +96,20 @@ def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, 
             continue
 
         text = text.replace("\\n", "\n").replace("\\t", "\t")
+        # --- Clean prompt formatting (same as annotate_toxicity.py line 45) ---
+        # Strip trailing \t0 / \t1 label
+        _parts = text.rsplit("\t", 1)
+        if len(_parts) == 2 and _parts[1].strip() in ("0", "1"):
+            text = _parts[0]
+        # Strip Query-N: prefixes (annotate_toxicity.py: re.split(r"Query-\d+:\ ", span)[-1])
+        import re as _re
+        cleaned_lines = []
+        for _line in text.split("\n"):
+            _line = _re.split(r"Query-\d+:\ ", _line)[-1]
+            if _line.strip():
+                cleaned_lines.append(_line.strip())
+        text = "\n".join(cleaned_lines)
+        text = text.replace("<s>[INST]", "").strip()
         if "Human:" in text or "Assistant:" in text:
             messages = []
             current_role = None
