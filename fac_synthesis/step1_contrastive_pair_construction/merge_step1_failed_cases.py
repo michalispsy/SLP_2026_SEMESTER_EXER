@@ -57,7 +57,7 @@ def merge_jsonl():
             activated = [s for s in samples if is_activated_sample(s)]
             if len(activated) >= 2:
                 srt = sorted(activated, key=lambda x: float(x.get("score", 0) or 0), reverse=True)
-                good, bad = srt[0], srt[1]
+                good, bad = srt[0], srt[-1]
                 triplets[fid] = {"good": good, "bad": bad}
 
     merged = []

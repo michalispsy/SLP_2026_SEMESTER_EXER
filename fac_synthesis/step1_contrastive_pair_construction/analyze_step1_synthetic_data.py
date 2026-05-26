@@ -16,7 +16,7 @@ def analyze_data():
     args = parser.parse_args()
 
     FINAL_DECISION_FILE = args.final_decision_file
-    EXTSPANS_FILE = args.textspans_file
+    TEXTSPANS_FILE = args.textspans_file
     SYNTHETIC_QUERIES_FILE = args.synthetic_queries_file
     OUTPUT_JSONL = args.output_jsonl
     feature_df = pd.read_csv(FINAL_DECISION_FILE, sep='\t', usecols=[0], header=0)
@@ -81,7 +81,7 @@ def analyze_data():
     with open(SYNTHETIC_QUERIES_FILE, 'r', encoding='utf-8', errors='ignore') as f:
         idx = 1
         for line in f:
-            if re.match(r'^Query-\d+:', line):
+            if re.search(r'Query[- ]\d+\s*:', line, re.IGNORECASE):
                 t = line.rstrip('\n')
                 t = re.sub(r'\t[01]\s*$', '', t)
                 all_texts[idx-1] = t
