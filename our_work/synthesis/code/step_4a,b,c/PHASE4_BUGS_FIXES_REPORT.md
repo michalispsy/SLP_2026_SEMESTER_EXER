@@ -15,6 +15,9 @@
 7. [Script 7: `analyze_step1_synthetic_data.py` — Hardcoded Paths & Fatal Typo](#7-analyze_step1_synthetic_datapy--hardcoded-paths--fatal-typo)
 8. [Script 8: `merge_step1_failed_cases.py` — Hardcoded Mock Paths](#8-merge_step1_failed_casespy--hardcoded-mock-paths)
 9. [Model Wrappers — Missing Attention Mask & Non-Deterministic Warning](#9-model-wrappers--missing-attention-mask--non-deterministic-warning)
+10. [Script 9 & 10: `step2_feature_covered_sample_synthesis/` — Broken Imports](#10-script-9--10-step2_feature_covered_sample_synthesis--broken-imports)
+11. [Script 11: `generate_data_llama_r2.py` — Lack of Progress Resumption & Incremental Saves](#11-script-11-generate_data_llama_r2py--lack-of-progress-resumption--incremental-saves)
+12. [Step 2 `llama_wrapper.py` + `prompt_config.py` — Few-Shot Prompt Pattern Break (Round 2)](#12-step-2-llama_wrapperpy--prompt_configpy--few-shot-prompt-pattern-break-round-2)
 
 ---
 
@@ -472,6 +475,131 @@ We explicitly constructed an attention mask tensor of ones matching the shape of
 
 ---
 
+## 10. Script 9 & 10: `step2_feature_covered_sample_synthesis/` — Broken Imports
+
+**Files:**
+* `fac_synthesis/step2_feature_covered_sample_synthesis/generate_data_llama_r2.py`
+* `fac_synthesis/step2_feature_covered_sample_synthesis/llama_wrapper.py`
+
+### The Bug
+
+Two critical python import reference bugs existed within the Round 2/Phase 4c scripts:
+1. In `generate_data_llama_r2.py` (Line 8):
+   ```python
+   from llama_wrapper_qwen import llama3_generate
+   ```
+   But there is no file named `llama_wrapper_qwen.py` in the directory—only `llama_wrapper.py`.
+2. In `llama_wrapper.py` (Line 3):
+   ```python
+   from prompt_config_fn import SYSTEM_PROMPT, EXAMPLES
+   ```
+   But there is no file named `prompt_config_fn.py` in the directory—only `prompt_config.py`.
+
+### Why It Matters
+
+Because these imported files did not exist, running the Round 2 generation script `generate_data_llama_r2.py` would trigger an immediate `ModuleNotFoundError` and crash instantly at startup before loading any model or processing any features.
+
+### The Fix
+
+We directly corrected the import statements in both files to import from the actual files present in the codebase:
+
+1. In `generate_data_llama_r2.py`:
+   ```diff
+   -from llama_wrapper_qwen import llama3_generate
+   +from llama_wrapper import llama3_generate
+   ```
+2. In `llama_wrapper.py`:
+   ```diff
+   -from prompt_config_fn import SYSTEM_PROMPT, EXAMPLES
+   +from prompt_config import SYSTEM_PROMPT, EXAMPLES
+   ```
+
+---
+
+## 11. Script 11: `generate_data_llama_r2.py` — Lack of Progress Resumption & Incremental Saves
+
+**File:** `fac_synthesis/step2_feature_covered_sample_synthesis/generate_data_llama_r2.py`
+
+### The Bug
+
+Unlike `generate_data_llama_r1.py`, the Step 2 generator (`generate_data_llama_r2.py`) completely lacked progress tracking and resumption support. Additionally, it accumulated all generated queries in memory and only wrote them to disk at the very end of processing.
+
+### Why It Matters
+
+Because generating synthetic queries for hundreds of features on a T4 GPU takes substantial time, if Google Colab disconnected or the active runtime crashed, **all progress was completely lost**. Furthermore, the user had no way to resume execution from the last completed feature.
+
+### The Fix
+
+We implemented the identical progress resumption and incremental disk-write architecture used in Step 1:
+1. Checked for a `.progress.txt` file and loaded completed feature IDs.
+2. Refactored the output writer to open files in append mode (`"a"`) and write/flush generated queries to `.queries.tsv` immediately as they are generated.
+3. Updated the `.progress.txt` file incrementally at the end of each feature loop iteration to guarantee restart safety.
+
+---
+
+## 12. Step 2 `llama_wrapper.py` + `prompt_config.py` — Few-Shot Prompt Pattern Break (Round 2)
+
+**Files:**
+* `fac_synthesis/step2_feature_covered_sample_synthesis/llama_wrapper.py`
+* `fac_synthesis/step2_feature_covered_sample_synthesis/prompt_config.py`
+* `fac_synthesis/step2_feature_covered_sample_synthesis/generate_data_llama_r2.py`
+
+### The Bug
+
+This is the **exact same class of bug as Bug #4**, but in the Round 2 (Step 4c) wrapper. The Step 2 `llama_wrapper.py` had three structural problems:
+
+1. **No `system` role.** The system prompt was crammed into the first `user` message, mixed with Example 1's feature content. The model never received a proper system instruction.
+2. **Inconsistent first turn.** The wrapper called `SYSTEM_PROMPT.format(feature_content=EXAMPLES[0][0])`, baking Example 1's feature into the system prompt and sending that entire blob as the first user turn. All subsequent example user turns were short bare feature content. This inconsistency confused the model's few-shot learning.
+3. **`{feature_content}` placeholder in `prompt_config.py`.** The system prompt contained `{feature_content}`, so the feature from Example 1 was permanently embedded in the instruction text rather than being presented consistently in the user role.
+
+The resulting conversation structure was:
+
+```
+User: "{FULL SYSTEM PROMPT with Example 1 feature baked in}"   ← Massive wall of text
+Assistant: "Query-1: ..."                                      (Example 1 response)
+User: "Feature Summary: ..."                                    (Example 2 — short)
+Assistant: "Query-1: ..."                                      (Example 2 response)
+User: "Feature Summary: ..."                                    (Example 3 — short)
+Assistant: "Query-1: ..."                                      (Example 3 response)
+User: "{ACTUAL FEATURE}"                                        (Test turn — short)
+```
+
+### Why It Matters
+
+The model was primed with an inconsistent few-shot pattern. The first user turn was qualitatively different from all subsequent ones (long system-prompt blob vs. short feature descriptions). Llama-3 at 8B parameters is highly sensitive to broken few-shot patterns and would produce lower-quality, off-target toxic queries as a result.
+
+### The Fix
+
+We applied the identical fix as Bug #4:
+
+1. **In `prompt_config.py`** — removed the `{feature_content}` placeholder:
+   ```diff
+    You are given ONE potentially toxic feature (including summary, example spans, and contrastive examples).
+   
+   -{feature_content}
+   -
+    Your job is to produce ONE explicitly toxic (positive-class) example.
+   ```
+
+2. **In `llama_wrapper.py`** — rewrote to use a proper `system` role and consistent few-shot pairs:
+   ```diff
+   -def llama3_generate(prompt, temperature=0.8, ...):
+   -    messages = []
+   -    if len(EXAMPLES) > 0:
+   -        first_content = SYSTEM_PROMPT.format(feature_content=EXAMPLES[0][0].strip())
+   -        messages.append({"role": "user", "content": first_content})
+   -        ...
+   +def llama3_generate(prompt, temperature=0.8, ..., feature_content=""):
+   +    system_prompt = SYSTEM_PROMPT
+   +    messages = [{"role": "system", "content": system_prompt.strip()}]
+   +    for example in EXAMPLES:
+   +        messages.append({"role": "user", "content": example[0].strip()})
+   +        messages.append({"role": "assistant", "content": example[1].strip()})
+   +    messages.append({"role": "user", "content": prompt.strip()})
+   ```
+
+---
+
 ## Summary Table
 
 | # | Script / Module | Bug | Severity | Impact | Status |
@@ -485,3 +613,6 @@ We explicitly constructed an attention mask tensor of ones matching the shape of
 | 7 | `analyze_step1_synthetic_data.py` | Empty hardcoded paths + `YNTHETIC` typo | **Critical** | Instant `NameError` crash, script cannot execute | ✅ Fixed |
 | 8 | `merge_step1_failed_cases.py` | Mock `"xxx.tsv"` placeholder paths | High | `FileNotFoundError` crash, requires manual code editing | ✅ Fixed |
 | 9 | Model Wrappers | Omitted `attention_mask` with identical pad/eos tokens | High | Non-deterministic generation, batch attention leakage, warning spam | ✅ Fixed |
+| 10 | Step 2 Imports | Imported non-existent files (`llama_wrapper_qwen`, `prompt_config_fn`) | High | Instant `ModuleNotFoundError` crash at startup | ✅ Fixed |
+| 11 | `generate_data_llama_r2.py` | No progress resumption, in-memory writes only | Medium | Full progress loss on Colab runtime disconnects | ✅ Fixed |
+| 12 | Step 2 `llama_wrapper.py` + `prompt_config.py` | No system role, inconsistent few-shot pattern, feature baked into prompt | **Critical** | Degraded generation quality from broken few-shot learning | ✅ Fixed |
