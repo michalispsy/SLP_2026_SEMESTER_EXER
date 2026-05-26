@@ -44,7 +44,7 @@ class TopKCollector:
 
 IDX = tc.arange(65536)
 
-def activations(messages, model, sae, tokenizer, threshold, size=32, shift=31):
+def activations(messages, model, sae, tokenizer, size=32, shift=31):
     """
     Compute neuron activations for one conversation.
     'messages' is a list of {"role": ..., "content": ...}.
@@ -66,7 +66,7 @@ def activations(messages, model, sae, tokenizer, threshold, size=32, shift=31):
     device = model._device
     IDX_dev = IDX.to(device)
     act, pos = sae.actvs.squeeze()[shift:].max(dim=0)
-    choose = act > threshold
+    choose = act > args.threshold
     idx = IDX_dev[choose].tolist()
     act = act[choose].float().cpu().tolist()
     pos = pos[choose].cpu().tolist()
@@ -76,14 +76,14 @@ def activations(messages, model, sae, tokenizer, threshold, size=32, shift=31):
     sae.topk = topk
     return {"Neurons": idx, "Spans": spans, "Scores": act}
 
-def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, ttlgroup, threshold, data_path, out_dir, max_collects):
+def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, ttlgroup, max_collects):
     sae.eval()
     sae.MaskTopK = False
     generator._model.eval()
     switch_mode(sae, "train")
     sae.early_stop = True
-    dataset_name = os.path.splitext(os.path.basename(data_path))[0]
-    root = os.path.join(out_dir, f"threshold_{threshold}")
+    dataset_name = os.path.splitext(os.path.basename(args.data_path))[0]
+    root = f"./xxx/threshold_{args.threshold}"
     os.makedirs(root, exist_ok=True)
 
     collectors = [TopKCollector(max_collects) for _ in range(65536)]
@@ -93,11 +93,6 @@ def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, 
         bar.update(1)
         if idx % ttlgroup != subgroup:
             continue
-
-        # Strip trailing label (e.g. \t1 or \t0) to prevent leaking into tokenizer context
-        parts = text.rsplit("\t", 1)
-        if len(parts) == 2 and parts[1].strip().isdigit():
-            text = parts[0]
 
         text = text.replace("\\n", "\n").replace("\\t", "\t")
         if "Human:" in text or "Assistant:" in text:
@@ -121,7 +116,7 @@ def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, 
             print(f"[WARN] Empty message skipped at sample {idx}")
             continue
         try:
-            results = activations(messages, generator, sae, tokenizer, threshold)
+            results = activations(messages, generator, sae, tokenizer)
         except Exception as e:
             print(f"[WARN] Template error at sample {idx}: {e}")
             continue
@@ -157,8 +152,6 @@ if __name__ == "__main__":
                         help="Path to the input dataset file (e.g., TD_train_1.tsv)")
     parser.add_argument("--threshold", type=float, required=True,
                         help="Activation threshold (e.g., 0, 0.5, 1.0, 1.5, 2.0, 4.0)")
-    parser.add_argument("--out-dir", type=str, default="./xxx",
-                        help="Output directory for the collected spans.")
     
     args = parser.parse_args()
 
@@ -187,10 +180,28 @@ if __name__ == "__main__":
 
     model_ckpt = model_map[model_key]
 
+    import re as _re
+    def _clean_query(line):
+        """Clean synthetic query text before SAE scanning.
+        Strips: Query-N: prefixes, trailing \\t0/\\t1 labels, escaped newlines.
+        Same logic as annotate_toxicity.py format() (line 45).
+        """
+        text = line.rstrip("\n")
+        # Strip trailing label (e.g. \t1 or \t0)
+        parts = text.rsplit("\t", 1)
+        if len(parts) == 2 and parts[1].strip() in ("0", "1"):
+            text = parts[0]
+        # Unescape
+        text = text.replace("\\n", "\n").replace("\\t", "\t")
+        # Strip Query-N: prefixes (same regex as annotate_toxicity.py)
+        text = _re.sub(r"Query[- ]?\d+\s*:\s*", "", text)
+        return text.strip()
+
     corpus = CorpusSearchIndex(
         args.data_path,
         cache_freq=1000,
         sampling=None,
+        postfunc=_clean_query,
     )
     generator = Generator(model_ckpt, device="cuda", dtype="bfloat16")
     tokenizer = generator._tokenizer
@@ -199,6 +210,6 @@ if __name__ == "__main__":
     mount_function(generator._model, model_key, int(layer), sae)
 
     with tc.no_grad():
-        collect_text_spans(corpus, sae, generator, tokenizer, model_key, subgroup, ttlgroup, args.threshold, args.data_path, args.out_dir, max_collects=1000)
+        collect_text_spans(corpus, sae, generator, tokenizer, model_key, subgroup, ttlgroup, max_collects=1000)
 
    
