@@ -83,7 +83,8 @@ def collect_text_spans(corpus, sae, generator, tokenizer, model_name, subgroup, 
     switch_mode(sae, "train")
     sae.early_stop = True
     dataset_name = os.path.splitext(os.path.basename(args.data_path))[0]
-    root = f"./xxx/threshold_{args.threshold}"
+    root = args.out_dir if args.out_dir else f"./xxx/threshold_{args.threshold}"
+    root = os.path.join(root, f"threshold_{args.threshold}") if args.out_dir else root
     os.makedirs(root, exist_ok=True)
 
     collectors = [TopKCollector(max_collects) for _ in range(65536)]
@@ -152,6 +153,8 @@ if __name__ == "__main__":
                         help="Path to the input dataset file (e.g., TD_train_1.tsv)")
     parser.add_argument("--threshold", type=float, required=True,
                         help="Activation threshold (e.g., 0, 0.5, 1.0, 1.5, 2.0, 4.0)")
+    parser.add_argument("--out-dir", type=str, default=None,
+                        help="Output directory. Defaults to ./xxx/threshold_{threshold}")
     
     args = parser.parse_args()
 
