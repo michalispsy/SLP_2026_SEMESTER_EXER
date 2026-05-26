@@ -4,15 +4,12 @@ import pandas as pd
 import argparse
 
 
-def split_summary_and_spans(text):
-    text = text.replace("\\n", "\n")
-    parts = text.split("\n\n", 1)
-    summary_part = parts[0].strip()
-    span_part = parts[1] if len(parts) > 1 else ""
-    spans = re.findall(r"Span\s*\d+:\s*(.+)", span_part)
+def split_summary_and_spans(summary_col, words_col):
+    words_col = words_col.replace("\\n", "\n")
+    spans = re.findall(r"Span\s*\d+:\s*(.+)", words_col)
     top_spans = spans[:1] if spans else []
     span_text = "; ".join(s.strip() for s in top_spans)
-    return summary_part, span_text
+    return summary_col.strip(), span_text
 
 def is_activated_sample(s):
     try:
@@ -38,8 +35,9 @@ def merge_jsonl():
     df = pd.read_csv(FINAL_DECISION_FILE, sep="\t", header=0, dtype=str, keep_default_na=False)
     for _, row in df.iterrows():
         fid = int(row.iloc[0])
-        summary_text = "\t".join(row.astype(str).tolist())
-        summary, spans = split_summary_and_spans(summary_text)
+        summary_col = row.iloc[1] if len(row) > 1 else ""
+        words_col = row.iloc[2] if len(row) > 2 else ""
+        summary, spans = split_summary_and_spans(summary_col, words_col)
         summary_clean = re.sub(rf"^{fid}\s+", "", summary)
         summary_map[fid] = summary_clean
         span_map[fid] = spans

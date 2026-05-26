@@ -5,7 +5,7 @@ from collections import defaultdict
 
 import argparse
 
-TARGET_SAMPLE_COUNT = 2
+TARGET_SAMPLE_COUNT = 5
 
 def analyze_data():
     parser = argparse.ArgumentParser(description="Analyze synthetic data and select top candidates.")
