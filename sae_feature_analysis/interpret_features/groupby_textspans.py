@@ -71,7 +71,7 @@ if __name__ == "__main__":
     bar = tqdm.tqdm(total=2**16)
     activated = 0
     print("./%s.tsv" % file.replace("textspans", "TopAct"))
-    with open("xxx.tsv" % file.replace("textspans", "TopAct"), "w", encoding="utf8") as f:
+    with open("%s.tsv" % file.replace("textspans", "TopAct"), "w", encoding="utf8") as f:
         f.write("FeatureID\tWords\n")
         for idx in range(2 ** 16):
             span = reader.get_neuron_spans(idx, topK=10)
