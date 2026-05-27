@@ -26,7 +26,7 @@
 ```python
 # Πριν:
 good, bad = srt[0], srt[1]   # best vs. 2nd best
-
+s
 # Μετά:
 good, bad = srt[0], srt[-1]  # best vs. worst
 ```
