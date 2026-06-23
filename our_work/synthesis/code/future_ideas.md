@@ -33,6 +33,53 @@
 
 ---
 
+<<<<<<< HEAD
+## 3. SAE Filtering of Step 4c Candidates (Post-Synthesis SAE Filter)
+
+**Current state:**  
+`generate_data_llama_r2.py` (Step 4c) generates 2 candidates per missing feature but does **not** run the SAE on the Round 2 outputs. There is no verification that the synthesized query actually activates the target neuron — only a prompt-level proxy (the instruction to include the exact span phrase) is used.
+
+**The idea:**  
+After Step 4c synthesis, run the SAE on all generated candidates and apply proper filtering and selection:
+
+1. For each missing feature _i_, compute g_i(x) for every candidate query x.
+2. **Keep only the single best-performing query per feature** (the one with the highest g_i(x) activation score).
+3. **Drop any feature where no candidate achieves g_i(x) > δ** (the activation threshold, default δ = 0.0). This means a feature is dropped entirely if synthesis failed to produce a query that reliably activates it.
+
+**Why this matters:**  
+This is what the paper describes in Section 6 and Appendix J but is currently missing from our implementation. The 200 surviving samples reported in the paper are the result of exactly this filter. Without it, we risk adding queries to the training set that do not actually activate the intended SAE neuron — they are topically related at the surface level but miss the latent representation the feature encodes. The filter also naturally keeps the training set small (at most 1 sample per missing feature) and maximally targeted.
+
+---
+
+## 4. SAE-Filtered Task Toxic Data in Training
+
+**Current state:**  
+The final training set is: **1,000 helpful (safe, label=0) + ≤200 synthesized toxic (label=1, for F_miss features)**. The Red-Team data that was used as the seed to compute F(Q_Z) is never included in training, which means the model sees zero toxic examples for the features in F(P_Z) ∩ F(Q_Z) — features present in both the anchor and the seed but never synthesized.
+
+**The idea:**  
+Use **500 toxic-only queries** (e.g., from the Red-Team subset) as a task dataset and apply SAE filtering to select the most informative representative per activated neuron. Specifically:
+
+1. Take 500 Red-Team (toxic) queries as the task pool.
+2. Run the SAE on each query; for each query record which task-relevant toxic features it activates and at what score (g_i(x)).
+3. For each activated toxic neuron _i_, **keep only the top-scoring query** (the one with the highest g_i(x) across all 500 queries). Discard duplicates.
+4. Add these filtered task-toxic queries to the training set as additional toxic (label=1) examples.
+
+**Resulting training set:**
+
+```
+1,000 helpful (safe, label=0)
++ ≤500 filtered task toxic (label=1, best query per activated F(Q_Z) neuron)
++ ≤314 filtered synthesized toxic (label=1, best query per F_miss neuron, from Step 4c + SAE filter above)
+```
+
+**Why this matters:**  
+This directly addresses the coverage gap identified in the analysis: features in F(P_Z) ∩ F(Q_Z) are currently never seen as labeled-toxic examples during training, even though the anchor confirms they are task-relevant. By selecting the best Red-Team query per activated neuron, we:
+- Cover F(P_Z) ∩ F(Q_Z) with real, high-activation toxic examples.
+- Keep the dataset small and focused (at most 1 example per neuron, no redundancy).
+- Combine naturally with Idea 3: both the synthesized queries (F_miss) and the real queries (F(Q_Z)) are SAE-filtered to the same quality standard.
+
+The combined training set would cover the **entire F(P_Z)** with at least one toxic example per task-relevant neuron, which is the theoretical upper bound of what the anchor tells us the model needs to learn.
+=======
 ## 3. Head-Only Fine-Tuning ως Εναλλακτικό Evaluation Protocol
 
 **Η τρέχουσα κατάσταση:**  
@@ -89,3 +136,4 @@
 - Δυνατότητα **iterative self-improvement** (Round 2 synthesis, όπως αναφέρει το paper)
 
 > **Σημείωση:** Αυτό απαιτεί σημαντικό compute time (ξανατρέξιμο Phase 2 + 3 + 4), αλλά είναι η σωστή μεθοδολογία.
+>>>>>>> d6eecec217ca34ae40e5ebbc7458e24ee55e9523
