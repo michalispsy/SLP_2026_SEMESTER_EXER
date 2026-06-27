@@ -30,6 +30,8 @@ def main():
     parser.add_argument("--min_exchanges", type=int, default=1)
     parser.add_argument("--max_exchanges", type=int, default=3)
     parser.add_argument("--max_retry_per_question", type=int, default=2)
+    parser.add_argument("--num_synthetic_samples", type=int, default=2,
+                        help="Number of queries generated per feature (num_return_sequences).")
     args = parser.parse_args()
 
     features = []
@@ -60,7 +62,6 @@ def main():
         print(f"[RESUME] Found {len(completed_fids)} already completed features. Resuming from where we left off.")
 
     error_fids = []
-    forced_fids = []   # features whose span had to be force-injected (no natural hit)
     for feat in features:
         for key in [
             "Feature Summary", "Good example", "Bad example",
@@ -100,102 +101,84 @@ def main():
             
             print(f"\n{'='*60}\n🔹 PROMPT FOR FEATURE {fid}:\n{user_msg}\n{'='*60}")
             
-            # ── Span enforcement setup ───────────────────────────────────
-            span_norm = good_span.lower().strip() if good_span else ""
-            try:
-                mandatory = float(good_score or 0) > 4   # span required when Good Score > 4
-            except (TypeError, ValueError):
-                mandatory = False
+            success = False
+            for i in range(num_per_feature):
+                response = llama3_generate(user_msg, temperature=args.temperature, num_return_sequences=args.num_synthetic_samples, feature_content=user_msg)
 
-            def _parse(raw):
-                """Extract a single cleaned query string from a raw generation, or None."""
-                raw = raw.strip()
-                if not re.search(r'\t[01]\s*$', raw):
-                    raw = raw.rstrip("\n ") + "\t0"
-                segs = re.findall(
-                    r'(?:^|\n)\s*(Query[- ]\d+\s*:\s*.*?)(?=(?:\n\s*Query[- ]\d+\s*:)|(?:\t\s*[01]\s*$)|$)',
-                    raw, flags=re.S)
-                if not segs:
-                    return None
-                tmp = []
-                for s in segs:
-                    m_idx = re.match(r'\s*Query[- ](\d+)\s*:', s)
-                    idx = int(m_idx.group(1)) if m_idx else 999999
-                    s_clean = re.sub(r'^\s*Query[- ]\d+\s*:\s*', '', s, flags=re.I).strip()
-                    s_clean = s_clean.replace("\r", "").replace("\n", " ").replace("\t", " ")
-                    tmp.append((idx, s_clean))
-                tmp.sort(key=lambda x: x[0])
-                q = re.sub(r'\s+', ' ', " ".join(s for _, s in tmp)).strip()
-                return q or None
-
-            # ── Best-of-N generation across temperatures; prefer span hits ─
-            accepted, fallback_q = [], None
-            MAX_TRIES = 8
-            temps = [args.temperature, 0.7, 0.9, 1.1, 0.6, 1.0, 0.8, 1.2]
-            for attempt in range(MAX_TRIES):
-                if len(accepted) >= 2:
-                    break
-                response = llama3_generate(user_msg, temperature=temps[attempt % len(temps)],
-                                           num_return_sequences=2, feature_content=user_msg)
                 if not response:
+                    print(f"[WARN] Empty response for feature {fid}")
                     continue
-                for text in response:
+                
+                # We expect 2 output sequences from num_return_sequences=2
+                for slot_idx, text in enumerate(response):
                     if not text.strip():
                         continue
+                    text = text.strip()
+
+                    # Fallback trailing label if missing
+                    if not re.search(r'\t[01]\s*$', text):
+                        text = text.rstrip("\n ") + "\t0"
+
                     try:
-                        q = _parse(text)
+                        label = 1
+
+                        # Relaxed regex to match Query segments
+                        segs = re.findall(
+                            r'(?:^|\n)\s*(Query[- ]\d+\s*:\s*.*?)(?=(?:\n\s*Query[- ]\d+\s*:)|(?:\t\s*[01]\s*$)|$)',
+                            text,
+                            flags=re.S
+                        )
+
+                        if not segs:
+                            print(text)
+                            print(f"[WARN] No valid Query segments for feature {fid}, slot {slot_idx}")
+                            continue
+
+                        tmp = []
+                        for s in segs:
+                            m_idx = re.match(r'\s*Query[- ](\d+)\s*:', s)
+                            idx = int(m_idx.group(1)) if m_idx else 999999
+                            s_clean = re.sub(r'^\s*Query[- ]\d+\s*:\s*', '', s, flags=re.I).strip()
+                            s_clean = s_clean.replace("\r", "").replace("\n", " ").replace("\t", " ")
+                            tmp.append((idx, s_clean))
+                        tmp.sort(key=lambda x: x[0])
+
+                        qtext = " ".join(s for _, s in tmp)
+                        qtext = re.sub(r'\s+', ' ', qtext).strip()
+
+                        # Write to files immediately
+                        qline = qtext
+                        tf.write(f"{qline}\t{label}\n")
+                        tf.flush()
+
+                        plf.write(json.dumps({
+                            "FeatureID": fid,
+                            "slot": slot_idx,
+                            "query": qtext,
+                            "label": label,
+                            "context_used": context_text[:4000]
+                        }, ensure_ascii=False) + "\n")
+                        plf.flush()
+
+                        print(f"🔸 LLM RESPONSE (Slot {slot_idx}):\n{qtext}\n{'-'*60}")
+                        success = True
+
                     except Exception as e:
                         print(f"[skip {fid}] {e}")
-                        continue
-                    if not q:
-                        continue
-                    if fallback_q is None:
-                        fallback_q = q
-                    if (not span_norm) or (span_norm in q.lower()):
-                        accepted.append(q)
-                        if len(accepted) >= 2:
-                            break
 
-            # ── Decide what to write ─────────────────────────────────────
-            forced = False
-            if accepted:
-                to_write = accepted[:2]                       # natural span-containing query(ies)
-            elif mandatory and good_span:
-                # No natural hit: force-inject the activating span so the feature still fires in 4d
-                base = fallback_q or ""
-                fq = (f"{base.rstrip('.!? ')}. {good_span}".strip() if base else good_span)
-                to_write = [re.sub(r'\s+', ' ', fq).strip()]
-                forced = True
-                forced_fids.append(int(fid))
-            elif fallback_q:
-                to_write = [fallback_q]                        # span not mandatory: keep best paraphrase
-            else:
-                to_write = []
-
-            if to_write:
-                for slot_idx, qtext in enumerate(to_write):
-                    tf.write(f"{qtext}\t1\n")
-                    tf.flush()
-                    plf.write(json.dumps({
-                        "FeatureID": fid,
-                        "slot": slot_idx,
-                        "query": qtext,
-                        "label": 1,
-                        "span_hit": bool(span_norm and span_norm in qtext.lower()),
-                        "forced": forced,
-                        "context_used": context_text[:4000]
-                    }, ensure_ascii=False) + "\n")
-                    plf.flush()
-                print(f"🔸 FEATURE {fid}: wrote {len(to_write)} query(ies) "
-                      f"(span_hit={bool(accepted)}, forced={forced})")
-            else:
-                print(f"[CRITICAL] No query produced for feature {fid}. Using placeholder.")
+            if not success:
+                print(f"[CRITICAL] Failed to generate valid queries for feature {fid}. Using fallback placeholder.")
                 error_fids.append(int(fid))
+                # Fallback to keep sequence index alignment
                 qtext = f"This is a placeholder toxic query to maintain feature sequence alignment for missing feature {fid}."
-                tf.write(f"{qtext}\t1\n")
+                qline = qtext
+                tf.write(f"{qline}\t1\n")
                 tf.flush()
                 plf.write(json.dumps({
-                    "FeatureID": fid, "slot": 0, "query": qtext, "label": 1,
+                    "FeatureID": fid,
+                    "slot": 0,
+                    "query": qtext,
+                    "label": 1,
                     "context_used": context_text[:4000]
                 }, ensure_ascii=False) + "\n")
                 plf.flush()
@@ -206,8 +189,7 @@ def main():
             
             time.sleep(args.sleep)
 
-    print(f"Features with no valid segments (placeholder): {error_fids}")
-    print(f"Features that needed span force-injection: {len(forced_fids)} {forced_fids}")
+    print(f"Features with no valid segments: {error_fids}")
     print(f"[INFO] Saved queries to {tsv_out}")
 
 if __name__ == "__main__":
