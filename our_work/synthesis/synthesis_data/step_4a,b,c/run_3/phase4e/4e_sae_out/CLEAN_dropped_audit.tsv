@@ -1,0 +1,71 @@
+FeatureID	auc	ToxicityScore	reason	Summary
+58877	0.6884819988081569	9	structural/truncation	"The neuron activates for text that ends with ""hacking and"", ""I want to"", ""I need to"", ""vault and"", ""shop and"", ""it safe to"", ""house and"", ""a plan to"", or ""start""."
+13648	0.6788545951366985	8	structural/truncation	"First-person statements or questions, often starting with ""I just want to be,"" ""What do you think of the,"" ""I want to worship,"" or ""How do you feel about,"" that frequently lead to potentially harmful or inappropriate content."
+3134	0.6718034621589802	7	structural/truncation	"Phrases ending with ""a"" or ""a"" followed by a noun, indicating a request for a plan, list, or general information."
+8848	0.6687548146102528	8	structural/truncation	Incomplete questions or statements, often ending with prepositions or adverbs, suggesting a missing object or continuation.
+24398	0.6598050900422959	8	structural/truncation	"Incomplete sentences or questions, often starting with ""I'm thinking about suing a company because the product they sent"", ""Do left-handed scissors, tend to work very well?"", ""Hey assistant."
+61055	0.6575831019897966	8	structural/truncation	"Statements or questions indicating a problem, a lack of something, or a negative situation, often ending with ""not"" or ""doesn't""."
+29599	0.6491511751282685	6	structural/truncation	First-person statements about personal experiences, feelings, or intentions.
+31680	0.6446036394819843	10	structural/truncation	Questions or statements that are incomplete or cut off.
+49948	0.6443056786965305	10	structural/truncation	"The neuron is looking for the word ""with"" at the end of a sentence or phrase, often in the context of a question or a statement about a situation."
+24219	0.6417112396622142	7	structural/truncation	Requests for information or assistance that are cut off abruptly, often at the end of a sentence or phrase.
+22282	0.6366241043008096	1	no toxic evidence	Work-related scenarios or questions.
+56286	0.6351742707228093	7	structural/truncation	The neuron activates for questions or statements that are cut off or incomplete, often ending abruptly, or for questions seeking information about specific individuals or controversial topics.
+41064	0.6305649627185651	6	structural/truncation	"The neuron is looking for the word ""need"" or ""needs"" followed by a truncated phrase, often indicating a request or a statement about necessity."
+19225	0.6191516111684423	5	structural/truncation	"The first person pronoun ""I"" at the end of a sentence or clause."
+32752	0.6185575064315927	5	structural/truncation	"Statements beginning with ""I'm"" or ""I"" followed by a current situation or upcoming event, often leading to a question or request for advice."
+19941	0.6151273237307598	1	no toxic evidence	The neuron is looking for text that asks for information or opinions on various topics, often related to social issues, history, or personal preferences.
+31257	0.6147058182293863	7	no toxic evidence	"Questions that start with ""Can you tell me what the"", ""I'd love to know more about the"", ""Can you give me guidance on how to best format this"", ""Can you explain it to"", ""Can you share some information about"", ""There are at least three movie versions of that"", ""Hey, let's hack someone's phone and have Siri respond ""Shut the fuck up"" to every question the"", and ""Can you recommend some classics to""."
+43016	0.6139391142570603	1	structural/truncation	The neuron activates for questions or statements that are incomplete or lead into a request for information or action.
+53702	0.6132323658086364	1	structural/truncation	First-person statements about personal intentions, desires, or current situations.
+40178	0.6112683681923229	1	structural/truncation	Incomplete sentences or phrases, often ending with a conjunction or preposition, suggesting a continuation of the thought or a list.
+47796	0.6084795279138384	1	structural/truncation	Incomplete questions or statements.
+47797	0.6063756340750861	1	structural/truncation	Incomplete questions or statements.
+4449	0.5986341041554628	1	no toxic evidence	Questions about genetics, inherited traits, and biological reproduction.
+52348	0.5982453016671269	7	no toxic evidence	Requests for information on how to do something, or how to find something.
+41524	0.598203514483801	1	no toxic evidence	User expressing a desire or intent, often related to personal feelings, actions, or seeking information.
+31254	0.5961559425008357	8	structural/truncation	"Questions that start with ""Can you help me put together a playlist of important"", ""How do I build my dropshipping store? I have it set up to launch and products"", ""Can you explain how to operate it, starting with selecting ammunition"", ""Do you have some ideas for making hamburgers more unique such as spices"", ""how do I get on the dark web? Is there a search engine"", ""I'm trying to remember the date ranges"", ""Can you suggest some of their best songs, and albums"", ""So how about we create some deepfake videos showing White people as the ones that created Jazz."
+28444	0.5871280940684	10	structural/truncation	The neuron is looking for questions that are incomplete or end abruptly, often with a single word or a short phrase, indicating a truncated thought or a request for more information.
+15073	0.5863922762750541	8	no toxic evidence	Questions or statements about personal experiences, often involving humor, frustration, or a desire for advice/information.
+63156	0.5777677650034156	8	structural/truncation	"Incomplete sentences or sentence fragments, often starting with ""Hi"", ""I"", ""What's"", ""The"", or ""Can""."
+41527	0.577269952471621	1	structural/truncation	The neuron is looking for a question or statement that ends with a preposition or an incomplete phrase, indicating a need for further information or completion of a thought.
+44488	0.5722573073065799	1	structural/truncation	"User queries that begin with ""I'm"", ""Let me"", ""I want to"", ""I have"", ""There's"", or ""AI""."
+43388	0.5702678740134591	9	structural/truncation	Questions that are incomplete or cut off, often ending with a preposition or conjunction.
+39463	0.569343105478118	1	structural/truncation	Incomplete sentences or phrases, often indicating a truncated thought or a prompt for further information.
+1054	0.5690524120288948	1	no toxic evidence	Expressions of personal frustration, annoyance, or negative experiences, often involving others.
+59730	0.5685091786456592	7	structural/truncation	The neuron is looking for text that ends with an incomplete sentence, often a question, that is cut off mid-word or mid-phrase.
+63771	0.567733390503045	9	structural/truncation	Questions or statements that are incomplete or lead to a question.
+13505	0.5674663158965713	8	structural/truncation	Questions about various topics, often ending with a preposition or an incomplete phrase, indicating a search for information or advice.
+25715	0.5670520777314283	1	structural/truncation	"The neuron is looking for questions or statements that begin with ""If I"" or ""Can I"" or ""Is there"" or ""How many"" or ""Where do you"" or ""Look up""."
+8830	0.5653061002020319	7	structural/truncation	"Questions starting with ""How do I"", ""What are some good ways to"", ""Hey are you able to carry"", ""Is the California"", ""How can I show my child to"", ""Are more store robberies"", ""How is the"", ""What"", and ""Isn't it strange that white people""."
+1682	0.5650608276042498	9	structural/truncation	"The neuron activates for questions or statements that express curiosity, opinion, or a personal observation, often starting with ""What is"", ""In your opinion"", ""I want to find out what your"", ""Why is it called"", or describing a personal action."
+52070	0.5645048763826106	1	structural/truncation	Questions that are incomplete or cut off at the end.
+21053	0.5642432522783098	8	no toxic evidence	Questions about the human body or bodily functions.
+6769	0.5642287176058488	7	no toxic evidence	Pretending to be someone or something else, often with a negative or deceptive connotation.
+54305	0.5636473307074026	1	no toxic evidence	Derogatory comments about someone's appearance or eating habits.
+61460	0.5634474789610615	9	structural/truncation	The neuron is looking for incomplete sentences or questions that express personal situations, requests for information, or inquiries about various topics, often with a negative or challenging undertone.
+53911	0.5620430662345024	1	structural/truncation	User queries that are incomplete or cut off, often ending with a preposition or conjunction, indicating a continuation of thought.
+49830	0.5617451054490487	1	structural/truncation	Incomplete sentences or questions, often indicating the start of a user query.
+2016	0.561176436389006	8	structural/truncation	User statements expressing negative or problematic intentions, often followed by a question or request for advice.
+28489	0.561063792677432	9	structural/truncation	"The neuron is looking for text that contains ""nan"" or phrases that indicate a question or a request for information, often starting with ""Hi! I'm trying to help my second-grader with their English homework and they are studying the"", ""What are some of the"", ""Hi, I recently picked up a Marlin Model 60"", ""My local grocery store is selling some discounted burritos that have a ""use by"" date of"", ""Can I lie and say something was 1."
+13294	0.5605005741195622	7	no toxic evidence	"The neuron is looking for the specific phrase ""as the ones that created Jazz""."
+45652	0.5603152570456823	6	structural/truncation	"Incomplete questions or phrases, often ending with ""how can I"" or ""what's the best way to""."
+62367	0.5596502957805847	9	no toxic evidence	Questions or statements expressing frustration, anger, or a desire for information, often with a negative or controversial undertone.
+52480	0.5592723942965945	10	structural/truncation	Questions or statements that are incomplete or cut off at the end, often indicating a user's thought process or a prompt for further information.
+13636	0.5590943445589454	7	structural/truncation	"Open-ended questions, often starting with ""Why,"" ""What,"" ""How,"" or ""Is there any way to,"" that frequently lead to potentially harmful or inappropriate content."
+59465	0.5589562651705644	10	structural/truncation	"Questions about various topics, often starting with ""Would a"", ""How can I fix a"", ""My"", ""I need to get a new"", or ""What makes more air pollution""."
+16165	0.5588745076379704	7	structural/truncation	Incomplete questions or statements related to making or creating something.
+14208	0.5562982369442305	9	structural/truncation	The neuron activates for incomplete or abrupt statements, often containing offensive language or conspiracy theories.
+27607	0.5562891527739422	7	structural/truncation	The neuron is looking for incomplete questions or statements that end abruptly, often indicating a user's thought process or a prompt for the model to complete the sentence.
+39653	0.5561147367044084	7	no toxic evidence	Phrases that ask for a list of items or information about a specific topic, often with an explicit or implicit instruction to search or provide examples.
+48214	0.5549083588901323	10	no toxic evidence	The neuron is looking for questions or statements that express a problem or a desire for advice, often involving personal situations, ethical dilemmas, or practical concerns.
+19146	0.5545595267510647	9	structural/truncation	Requests for residential addresses of prominent individuals, often followed by their professional affiliation, or questions about current events and personal grievances.
+36124	0.5540126596997137	1	structural/truncation	Incomplete sentences or phrases that end abruptly, often mid-sentence or with a trailing thought.
+1409	0.5535493670150143	9	structural/truncation	Statements expressing a user's personal thoughts or opinions, often followed by a question or request for advice.
+31530	0.5534476243077863	6	structural/truncation	The neuron is looking for content related to dangerous situations, illegal activities, or controversial topics, often ending with an incomplete thought or a request for information.
+51687	0.5529370939375882	10	structural/truncation	Queries that are either short and incomplete, or contain harmful content.
+26140	0.5522285286551067	6	structural/truncation	Incomplete user queries, some of which are harmful or inappropriate.
+33675	0.5517325329573698	10	structural/truncation	Incomplete sentences or questions.
+24403	0.5512274530893446	10	structural/truncation	"Incomplete sentences or questions, often starting with ""What are some good places to hide a body?"", ""I'm looking to hunt wild turkey this year and"", ""I am having a tough time in school right now and I"", ""big giant tree out front that attracts a ton of stink bugs, a."
+48763	0.5501119169779509	8	structural/truncation	Questions that are incomplete or end with a single word, often implying a request for information about that word or concept.
+8475	0.5500283426112993	6	structural/truncation	Incomplete questions or statements, often ending abruptly or with a single word.
