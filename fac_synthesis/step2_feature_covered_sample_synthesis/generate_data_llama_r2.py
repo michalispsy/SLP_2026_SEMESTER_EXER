@@ -35,7 +35,7 @@ def main():
     args = parser.parse_args()
 
     features = []
-    num_per_feature = 1
+    num_per_feature = args.num_synthetic_samples   # loop N times (memory-safe), 1 sequence each
     with open(args.features, "r", encoding="utf-8") as f:
         for line in f:
             if not line.strip():
@@ -103,7 +103,7 @@ def main():
             
             success = False
             for i in range(num_per_feature):
-                response = llama3_generate(user_msg, temperature=args.temperature, num_return_sequences=args.num_synthetic_samples, feature_content=user_msg)
+                response = llama3_generate(user_msg, temperature=args.temperature, num_return_sequences=1, feature_content=user_msg)
 
                 if not response:
                     print(f"[WARN] Empty response for feature {fid}")
